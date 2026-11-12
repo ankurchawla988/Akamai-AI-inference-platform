@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Inference Platform — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --navy:    #080E1A;
+  --navy2:   #0D1825;
+  --navy3:   #112032;
+  --border:  #1E3248;
+  --border2: #2A4560;
+  --text:    #C8DCF0;
+  --muted:   #5A7A9A;
+  --amber:   #F59E0B;
+  --amberD:  #B45309;
+  --teal:    #0D9488;
+  --tealL:   #14B8A6;
+  --coral:   #E05C3A;
+  --coralL:  #F87C5A;
+  --blue:    #1D6FA5;
+  --blueL:   #38A8E0;
+  --purple:  #7C3AED;
+  --purpleL: #A78BFA;
+  --green:   #16A34A;
+  --greenL:  #4ADE80;
+  --white:   #FFFFFF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--navy);
+  font-family: 'Syne', sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  padding: 32px 24px 48px;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(13,148,136,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(245,158,11,0.06) 0%, transparent 60%),
+    linear-gradient(180deg, #080E1A 0%, #060C16 100%);
+}
+
+/* ── Title ─────────────────────────────────── */
+.page-title {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.page-title h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  background: linear-gradient(135deg, var(--tealL), var(--blueL));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.page-title p {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .72rem;
+  color: var(--muted);
+  margin-top: 6px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* ── Layout ─────────────────────────────────── */
+.arch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  position: relative;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* ── Connector arrows ───────────────────────── */
+.connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  position: relative;
+  width: 100%;
+}
+.connector::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  width: 1.5px;
+  background: linear-gradient(180deg, var(--border2), var(--border));
+  transform: translateX(-50%);
+}
+.connector-label {
+  background: var(--navy2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 3px 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .68rem;
+  color: var(--muted);
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
+.connector-arrow {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--border2);
+}
+
+/* ── Node cards ─────────────────────────────── */
+.node {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--navy2);
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.node:hover {
+  border-color: var(--border2);
+  box-shadow: 0 0 32px rgba(0,0,0,.4);
+}
+
+/* top accent stripe */
+.node::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.node.teal::before  { background: linear-gradient(90deg, var(--teal), var(--tealL)); }
+.node.blue::before  { background: linear-gradient(90deg, var(--blue), var(--blueL)); }
+.node.coral::before { background: linear-gradient(90deg, var(--coral), var(--coralL)); }
+.node.amber::before { background: linear-gradient(90deg, var(--amberD), var(--amber)); }
+.node.purple::before{ background: linear-gradient(90deg, var(--purple), var(--purpleL)); }
+.node.green::before { background: linear-gradient(90deg, var(--green), var(--greenL)); }
+
+.node-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.node-logo {
+  width: 44px; height: 44px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.node-logo img {
+  width: 28px; height: 28px;
+  object-fit: contain;
+  filter: brightness(1.1);
+}
+.node-logo svg { width: 28px; height: 28px; }
+
+.node-text { flex: 1; min-width: 0; }
+.node-title {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: -.01em;
+}
+.node-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .68rem;
+  color: var(--muted);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .62rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.badge.teal   { color: var(--tealL);  border-color: rgba(13,148,136,.4);  background: rgba(13,148,136,.1); }
+.badge.blue   { color: var(--blueL);  border-color: rgba(29,111,165,.4);  background: rgba(29,111,165,.1); }
+.badge.coral  { color: var(--coralL); border-color: rgba(224,92,58,.4);   background: rgba(224,92,58,.1); }
+.badge.amber  { color: var(--amber);  border-color: rgba(245,158,11,.4);  background: rgba(245,158,11,.1); }
+.badge.purple { color: var(--purpleL);border-color: rgba(124,58,237,.4);  background: rgba(124,58,237,.1); }
+.badge.green  { color: var(--greenL); border-color: rgba(22,163,74,.4);   background: rgba(22,163,74,.1); }
+
+/* ── Namespace / cluster wrappers ───────────── */
+.cluster-wrap {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px 14px 18px;
+  position: relative;
+  margin-top: -6px;
+}
+.cluster-wrap.lke   { border-color: rgba(22,163,74,.35);  background: rgba(22,163,74,.03); }
+.cluster-label {
+  position: absolute;
+  top: -11px; left: 18px;
+  background: var(--navy);
+  padding: 0 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cluster-label.lke    { color: var(--greenL); }
+.cluster-label.ns-ai  { color: var(--tealL);  }
+.cluster-label.ns-mon { color: var(--purpleL);}
+
+/* Two-column layout inside LKE */
+.lke-cols {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.ns-wrap {
+  border: 1px dashed;
+  border-radius: 12px;
+  padding: 28px 12px 14px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ns-wrap.ai  { border-color: rgba(13,148,136,.3);  background: rgba(13,148,136,.03); }
+.ns-wrap.mon { border-color: rgba(124,58,237,.3);  background: rgba(124,58,237,.03); }
+
+/* GPU boundary inside ns-ai */
+.gpu-wrap {
+  border: 1px dashed rgba(245,158,11,.35);
+  border-radius: 10px;
+  padding: 28px 10px 10px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(245,158,11,.025);
+}
+.gpu-label {
+  position: absolute;
+  top: -10px; left: 12px;
+  background: var(--navy);
+  padding: 0 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .6rem;
+  font-weight: 600;
+  color: var(--amber);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  display: flex; align-items: center; gap: 5px;
+}
+
+/* GPU row: model + card side by side */
+.gpu-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Monitoring stack */
+.mon-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+/* Metric tiles */
+.metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+.metric-tile {
+  background: rgba(124,58,237,.08);
+  border: 1px solid rgba(124,58,237,.2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.metric-tile .val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--purpleL);
+}
+.metric-tile .lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .58rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* K8s infra row at bottom */
+.infra-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.infra-card {
+  border: 1px solid rgba(22,163,74,.25);
+  border-radius: 10px;
+  background: rgba(22,163,74,.04);
+  padding: 12px 14px;
+}
+.infra-card .ic-title {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--greenL);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.infra-card .ic-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .62rem;
+  color: var(--muted);
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.infra-card .ic-item:last-child { border-bottom: none; }
+
+/* User label */
+.user-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: .04em;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .65rem;
+  color: var(--muted);
+}
+.legend-line {
+  width: 28px; height: 1.5px;
+}
+.legend-line.solid { background: var(--border2); }
+.legend-line.dashed {
+  background: repeating-linear-gradient(90deg, var(--muted) 0, var(--muted) 4px, transparent 4px, transparent 8px);
+}
+
+/* ── Inline SVG logos ───────────────────────── */
+/* All logos are inlined SVG or Unicode characters — no external fetches */
+
+/* animation */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.arch > * { animation: fadeUp .4s ease both; }
+.arch > *:nth-child(1)  { animation-delay: .05s; }
+.arch > *:nth-child(2)  { animation-delay: .10s; }
+.arch > *:nth-child(3)  { animation-delay: .15s; }
+.arch > *:nth-child(4)  { animation-delay: .20s; }
+.arch > *:nth-child(5)  { animation-delay: .25s; }
+.arch > *:nth-child(6)  { animation-delay: .30s; }
+.arch > *:nth-child(7)  { animation-delay: .35s; }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>Enterprise AI Inference Platform</h1>
+  <p>GPU-Accelerated · Kubernetes-Native · Real-Time Streaming · Akamai Cloud</p>
+</div>
+
+<div class="arch">
+
+  <!-- USER -->
+  <div class="user-label">👤 User</div>
+
+  <!-- Arrow: User → Streamlit -->
+  <div class="connector">
+    <span class="connector-label">HTTP</span>
+    <span class="connector-arrow"></span>
+  </div>
+
+  <!-- STREAMLIT UI -->
+  <div class="node teal" style="width:100%">
+    <div class="node-inner">
+      <div class="node-logo" style="background:rgba(255,75,75,.12)">
+        <!-- Streamlit wordmark S -->
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M16 4L28 12L16 20L4 12Z" fill="#FF4B4B"/>
+          <path d="M4 20L16 28L28 20L16 12Z" fill="#FF4B4B" opacity=".6"/>
+        </svg>
+      </div>
+      <div class="node-text">
+        <div class="node-title">Streamlit Demo UI</div>
+        <div class="node-sub">Prompt input · streaming response · image/audio upload · live metrics dashboard</div>
+      </div>
+      <div class="node-badges">
+        <span class="badge teal">Real-time SSE</span>
+        <span class="badge coral">Live demo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow: Streamlit → Gateway -->
+  <div class="connector">
+    <span class="connector-label">POST /stream &nbsp;/chat</span>
+    <span class="connector-arrow"></span>
+  </div>
+
+  <!-- LKE CLUSTER -->
+  <div class="cluster-wrap lke">
+    <div class="cluster-label lke">
+      <svg width="12" height="12" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="#4ADE80" stroke-width="2.5"/><circle cx="16" cy="16" r="5" fill="#4ADE80"/><line x1="16" y1="2" x2="16" y2="11" stroke="#4ADE80" stroke-width="2.5"/><line x1="16" y1="21" x2="16" y2="30" stroke="#4ADE80" stroke-width="2.5"/><line x1="2" y1="16" x2="11" y2="16" stroke="#4ADE80" stroke-width="2.5"/><line x1="21" y1="16" x2="30" y2="16" stroke="#4ADE80" stroke-width="2.5"/></svg>
+      Linode Kubernetes Engine (LKE) — Akamai Cloud
+    </div>
+
+    <div class="lke-cols">
+
+      <!-- LEFT: ai-platform namespace -->
+      <div class="ns-wrap ai">
+        <div class="cluster-label ns-ai" style="top:-11px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="4" stroke="#14B8A6" stroke-width="2"/><path d="M7 12h10M12 7v10" stroke="#14B8A6" stroke-width="2" stroke-linecap="round"/></svg>
+          namespace: ai-platform
+        </div>
+
+        <!-- FastAPI Gateway -->
+        <div class="node blue">
+          <div class="node-inner">
+            <div class="node-logo" style="background:rgba(0,150,136,.12)">
+              <!-- FastAPI logo: lightning bolt -->
+              <svg viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="14" fill="#009688" opacity=".2"/>
+                <path d="M19 4L9 18h8l-4 10 14-16h-9l3-8z" fill="#009688"/>
+              </svg>
+            </div>
+            <div class="node-text">
+              <div class="node-title">FastAPI AI Gateway</div>
+              <div class="node-sub">/health &nbsp;·&nbsp; /chat &nbsp;·&nbsp; /stream &nbsp;·&nbsp; OpenAI-compatible</div>
+            </div>
+            <div class="node-badges">
+              <span class="badge blue">Routing</span>
+              <span class="badge teal">Proxy</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow: Gateway → vLLM -->
+        <div class="connector" style="height:36px">
+          <span class="connector-label">/v1/chat/completions</span>
+          <span class="connector-arrow"></span>
+        </div>
+
+        <!-- vLLM -->
+        <div class="node coral">
+          <div class="node-inner">
+            <div class="node-logo" style="background:rgba(224,92,58,.12)">
+              <!-- vLLM: stylised V -->
+              <svg viewBox="0 0 32 32" fill="none">
+                <path d="M4 6L16 26L28 6" stroke="#E05C3A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 6L16 18L22 6" stroke="#F87C5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>
+              </svg>
+            </div>
+            <div class="node-text">
+              <div class="node-title">vLLM Inference Runtime</div>
+              <div class="node-sub">PagedAttention · continuous batching · KV cache · stream: true</div>
+            </div>
+            <div class="node-badges">
+              <span class="badge coral">High-throughput</span>
+              <span class="badge amber">GPU-optimised</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow: vLLM → GPU -->
+        <div class="connector" style="height:36px">
+          <span class="connector-label">CUDA dispatch</span>
+          <span class="connector-arrow"></span>
+        </div>
+
+        <!-- GPU NODE -->
+        <div class="gpu-wrap">
+          <div class="gpu-label">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="12" rx="2" stroke="#F59E0B" stroke-width="2"/><path d="M7 6V4M12 6V4M17 6V4M7 18v2M12 18v2M17 18v2M1 10h2M21 10h2M1 14h2M21 14h2" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/></svg>
+            GPU Worker Node
+          </div>
+          <div class="gpu-row">
+            <!-- Mistral 7B -->
+            <div class="node coral" style="margin:0">
+              <div class="node-inner" style="padding:12px 14px; gap:10px">
+                <div class="node-logo" style="width:36px;height:36px;background:rgba(224,92,58,.12)">
+                  <!-- Mistral: stylised M -->
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <path d="M4 24V8l6 10 6-10 6 10 6-10v16" stroke="#E05C3A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="node-text">
+                  <div class="node-title" style="font-size:.82rem">Mistral-7B-Instruct</div>
+                  <div class="node-sub">v0.2 · 7B parameters</div>
+                </div>
+              </div>
+            </div>
+            <!-- RTX 4000 -->
+            <div class="node amber" style="margin:0">
+              <div class="node-inner" style="padding:12px 14px; gap:10px">
+                <div class="node-logo" style="width:36px;height:36px;background:rgba(245,158,11,.12)">
+                  <!-- NVIDIA: stylised N -->
+                  <svg viewBox="0 0 32 32" fill="none">
+                    <rect x="2" y="2" width="28" height="28" rx="6" fill="#76B900" opacity=".15"/>
+                    <path d="M7 24V8l18 16V8" stroke="#76B900" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div class="node-text">
+                  <div class="node-title" style="font-size:.82rem">NVIDIA RTX 4000 Ada</div>
+                  <div class="node-sub">Tensor Cores · CUDA</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GPU Operator -->
+          <div class="node amber" style="margin:0">
+            <div class="node-inner" style="padding:10px 14px">
+              <div class="node-logo" style="width:34px;height:34px;background:rgba(118,185,0,.12)">
+                <svg viewBox="0 0 32 32" fill="none">
+                  <circle cx="16" cy="16" r="6" stroke="#76B900" stroke-width="2"/>
+                  <path d="M16 2v4M16 26v4M2 16h4M26 16h4M5.5 5.5l2.8 2.8M23.7 23.7l2.8 2.8M5.5 26.5l2.8-2.8M23.7 8.3l2.8-2.8" stroke="#76B900" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="node-text">
+                <div class="node-title" style="font-size:.85rem">NVIDIA GPU Operator</div>
+                <div class="node-sub">Driver mgmt · device plugin · scheduling · telemetry</div>
+              </div>
+              <div class="node-badges">
+                <span class="badge amber">K8s-native</span>
+              </div>
+            </div>
+          </div>
+        </div><!-- /gpu-wrap -->
+      </div><!-- /ns-wrap.ai -->
+
+      <!-- RIGHT: monitoring namespace -->
+      <div class="ns-wrap mon">
+        <div class="cluster-label ns-mon" style="top:-11px">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M3 3h18v18H3z" stroke="#A78BFA" stroke-width="2" rx="2"/><path d="M7 17l4-8 3 5 2-3 2 6" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          ns: monitoring
+        </div>
+
+        <div class="mon-stack">
+
+          <!-- Prometheus -->
+          <div class="node purple">
+            <div class="node-inner" style="padding:12px 14px; gap:10px">
+              <div class="node-logo" style="width:38px;height:38px;background:rgba(229,115,0,.12)">
+                <!-- Prometheus torch -->
+                <svg viewBox="0 0 32 32" fill="none">
+                  <circle cx="16" cy="18" r="10" stroke="#E57300" stroke-width="2"/>
+                  <path d="M16 8V4M12 5l4-3 4 3" stroke="#E57300" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="16" cy="18" r="3" fill="#E57300"/>
+                </svg>
+              </div>
+              <div class="node-text">
+                <div class="node-title" style="font-size:.85rem">Prometheus</div>
+                <div class="node-sub">Metrics collection · scrape</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="connector" style="height:28px">
+            <span class="connector-arrow"></span>
+          </div>
+
+          <!-- Grafana -->
+          <div class="node purple">
+            <div class="node-inner" style="padding:12px 14px; gap:10px">
+              <div class="node-logo" style="width:38px;height:38px;background:rgba(240,85,0,.12)">
+                <!-- Grafana G -->
+                <svg viewBox="0 0 32 32" fill="none">
+                  <circle cx="16" cy="16" r="13" stroke="#F05A00" stroke-width="2"/>
+                  <path d="M24 16h-8v4h5a6 6 0 1 1 0-8" stroke="#F05A00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="node-text">
+                <div class="node-title" style="font-size:.85rem">Grafana</div>
+                <div class="node-sub">Live dashboards</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metric tiles -->
+          <div class="metric-grid">
+            <div class="metric-tile"><div class="val">GPU %</div><div class="lbl">utilisation</div></div>
+            <div class="metric-tile"><div class="val">tok/s</div><div class="lbl">throughput</div></div>
+            <div class="metric-tile"><div class="val">P99</div><div class="lbl">latency ms</div></div>
+            <div class="metric-tile"><div class="val">pods</div><div class="lbl">active</div></div>
+            <div class="metric-tile"><div class="val">VRAM</div><div class="lbl">GPU mem</div></div>
+            <div class="metric-tile"><div class="val">queue</div><div class="lbl">depth</div></div>
+          </div>
+
+        </div><!-- /mon-stack -->
+      </div><!-- /ns-wrap.mon -->
+
+    </div><!-- /lke-cols -->
+
+    <!-- K8s infra cards -->
+    <div class="infra-row">
+      <div class="infra-card">
+        <div class="ic-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#4ADE80" stroke-width="2"/><path d="M12 8v4l3 3" stroke="#4ADE80" stroke-width="2" stroke-linecap="round"/></svg>
+          K8s Services
+        </div>
+        <div class="ic-item">Service discovery</div>
+        <div class="ic-item">Pod scheduling</div>
+        <div class="ic-item">Namespace isolation</div>
+        <div class="ic-item">Load balancing</div>
+      </div>
+      <div class="infra-card">
+        <div class="ic-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12h18M3 12l4-4M3 12l4 4" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Ingress
+        </div>
+        <div class="ic-item">nginx ingress</div>
+        <div class="ic-item">TLS termination</div>
+        <div class="ic-item">Public endpoint</div>
+        <div class="ic-item">Traffic routing</div>
+      </div>
+      <div class="infra-card">
+        <div class="ic-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 8h16M4 12h10M4 16h6" stroke="#4ADE80" stroke-width="2" stroke-linecap="round"/><path d="M18 14l4 4-4 4" stroke="#4ADE80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Autoscaling
+        </div>
+        <div class="ic-item">HPA (planned)</div>
+        <div class="ic-item">KEDA (planned)</div>
+        <div class="ic-item">GPU-metric scale</div>
+        <div class="ic-item">Queue-depth trigger</div>
+      </div>
+    </div>
+
+  </div><!-- /cluster-wrap.lke -->
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-line solid"></div>
+      Request path
+    </div>
+    <div class="legend-item">
+      <div class="legend-line dashed"></div>
+      Metrics scrape
+    </div>
+  </div>
+
+</div><!-- /arch -->
+
+</body>
+</html>

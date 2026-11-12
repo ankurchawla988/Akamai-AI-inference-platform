@@ -1,0 +1,19 @@
+name: validate
+on: [pull_request, push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - run: pip install pyyaml
+      - name: Python syntax
+        run: python -m py_compile gateway/main.py ui/app.py scripts/load_test.py
+      - name: YAML parses
+        run: |
+          python - <<'PY'
+          import glob, yaml
+          for f in glob.glob("k8s/**/*.yaml", recursive=True):
+              list(yaml.safe_load_all(open(f))); print("ok", f)
+          PY

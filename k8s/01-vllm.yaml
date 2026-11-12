@@ -1,0 +1,80 @@
+# vLLM serving Mistral-7B-Instruct on a single GPU.
+# NOTE: strategy is Recreate on purpose — with one GPU, a RollingUpdate surge pod
+# could never schedule and the rollout would hang.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache
+  namespace: ai-platform
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: linode-block-storage-retain
+  resources:
+    requests:
+      storage: 40Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: ai-platform
+  labels: {app: vllm}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: vllm}
+  template:
+    metadata:
+      labels: {app: vllm}
+    spec:
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.6.3   # pin; verify tag on Docker Hub before deploying
+          args:
+            - --model=mistralai/Mistral-7B-Instruct-v0.2
+            - --dtype=half
+            - --max-model-len=8192
+            - --gpu-memory-utilization=0.90
+            - --port=8000
+          ports:
+            - {containerPort: 8000, name: http}
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef: {name: hf-token, key: token, optional: true}
+          resources:
+            requests: {cpu: "4", memory: 16Gi}
+            limits: {nvidia.com/gpu: 1, memory: 24Gi}
+          volumeMounts:
+            - {name: model-cache, mountPath: /root/.cache/huggingface}
+            - {name: shm, mountPath: /dev/shm}
+          startupProbe:          # first start downloads ~15GB of weights
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 10
+            failureThreshold: 90
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            periodSeconds: 20
+            failureThreshold: 3
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim: {claimName: model-cache}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+  namespace: ai-platform
+  labels: {app: vllm}
+spec:
+  selector: {app: vllm}
+  ports:
+    - {name: http, port: 8000, targetPort: 8000}

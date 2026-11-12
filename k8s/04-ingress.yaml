@@ -1,0 +1,20 @@
+# OPTIONAL: use instead of the LoadBalancer Service once ingress-nginx (+ cert-manager) is installed.
+# Streamlit needs WebSocket support; ingress-nginx handles this by default.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ui
+  namespace: ai-platform
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: demo.example.com        # <- change
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: ui, port: {number: 80}}

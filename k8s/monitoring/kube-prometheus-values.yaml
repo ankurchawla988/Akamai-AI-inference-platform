@@ -1,0 +1,20 @@
+# helm upgrade --install monitoring prometheus-community/kube-prometheus-stack -n monitoring -f this-file
+prometheus:
+  prometheusSpec:
+    # pick up ServiceMonitors from every namespace (vLLM, gateway, DCGM)
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    retention: 6h
+grafana:
+  adminPassword: change-me-before-the-event
+  service:
+    type: LoadBalancer
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+  grafana.ini:
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer

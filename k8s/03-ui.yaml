@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui
+  namespace: ai-platform
+  labels: {app: ui}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ui}
+  template:
+    metadata:
+      labels: {app: ui}
+    spec:
+      containers:
+        - name: ui
+          image: ghcr.io/YOUR_GH_USER/ai-ui:latest
+          ports:
+            - {containerPort: 8501, name: http}
+          env:
+            - {name: GATEWAY_URL, value: "http://gateway.ai-platform.svc.cluster.local:8080"}
+            - {name: GRAFANA_URL, value: ""}   # set to your Grafana URL for the sidebar link
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          readinessProbe:
+            httpGet: {path: /_stcore/health, port: 8501}
+---
+# Simplest public exposure on LKE: a LoadBalancer Service (provisions an Akamai NodeBalancer).
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  namespace: ai-platform
+spec:
+  type: LoadBalancer
+  selector: {app: ui}
+  ports:
+    - {name: http, port: 80, targetPort: 8501}
